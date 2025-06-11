@@ -47,12 +47,11 @@ app.post('/api/save-results', (req, res) => {
   }
   const filePath = path.join(RESULTS_DIR, `${username}_results.txt`);
   const timestamp = new Date().toISOString();
-  const content = `
-=== Quiz du ${timestamp} ===
-` +
-    results.map(r => `${r.question} | ${r.userAnswer} | ${r.correctAnswer} | ${r.time}s | ${r.correct ? 'Correct' : 'Incorrect'}`).join('
-') + '
-';
+  const contentLines = results.map(r => {
+  return `${r.question} | ${r.userAnswer} | ${r.correctAnswer} | ${r.time}s | ${r.correct ? 'Correct' : 'Incorrect'}`;
+  });
+  const content = `\n=== Quiz du ${timestamp} ===\n` + contentLines.join('\n') + '\n';
+
 
   fs.appendFileSync(filePath, content);
   res.json({ success: true });
