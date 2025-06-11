@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Quiz - Revise tes Maths</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    #app {
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+    .question {
+      font-weight: bold;
+      font-size: 1.4em;
+      margin-bottom: 15px;
+    }
+    input[type="text"] {
+      font-size: 1.2em;
+      padding: 8px;
+      width: 200px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    button {
+      font-size: 1.2em;
+      padding: 10px 25px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    #score {
+      font-weight: bold;
+      margin-top: 15px;
+    }
+    #summary {
+      margin-top: 30px;
+      text-align: left;
+      font-size: 1em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 6px 8px;
+    }
+    th {
+      text-align: left;
+      border-bottom: 2px solid #ccc;
+      color: #333;
+    }
+    tr.correct {
+      color: green;
+    }
+    tr.incorrect {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Revise tes Maths - Quiz</h1>
+    <div id="countdown" style="font-size: 2em; margin-bottom: 20px;"></div>
+    <div id="quiz" style="display:none;">
+      <div class="question" id="question"></div>
+      <input type="text" id="answer" autocomplete="off" />
+      <br />
+      <button id="validateBtn">Valider</button>
+      <div id="score">Nombre de bonnes réponses : 0 / 0</div>
+    </div>
+    <div id="summary" style="display:none;"></div>
+  </div>
+
+  <script>
+    const NUM_QUESTIONS = 20;
+    let questions = [];
+    let currentIndex = 0;
+    let correctCount = 0;
+    let startTime, elapsedTime;
+    let timerInterval;
+    let results = [];
+
+    // Vérifier utilisateur connecté
+    const username = localStorage.getItem('user');
+    if (!username) {
+      alert('Merci de vous connecter d\'abord.');
+      window.location.href = 'login.html';
+    }
+
+    const questionEl = document.getElementById('question');
+    const answerEl = document.getElementById('answer');
+    const validateBtn = document.getElementById('validateBtn');
+    const scoreEl = document.getElementById('score');
+    const quizEl = document.getElementById('quiz');
+    const summaryEl = document.getElementById('summary');
+    const countdownEl = document.getElementById('countdown');
+
+    // Chrono affichage centièmes
+    function startTimer() {
+      startTime = performance.now();
+      timerInterval = setInterval(() => {
+        const now = performance.now();
+        elapsedTime = (now - startTime) / 1000;
+      }, 10);
+    }
+    function stopTimer() {
+      clearInterval(timerInterval);
+    }
+
+    // Charger JSON et démarrer quiz
+    async function loadQuestions() {
+      try {
+        const res = await fetch('questions.json');
+        const allQuestions = await res.json();
+        // Choisir 20 questions aléatoires
+        questions = shuffleArray(allQuestions).slice(0, NUM_QUESTIONS);
+        startCountdown();
+      } catch (err) {
+        alert('Erreur de chargement des questions.');
+        console.error(err);
+      }
+    }
+
+    // Mélanger tableau
+    function shuffleArray(array) {
+      for (let i = array.length -1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Afficher question courante
+    function showQuestion() {
+      answerEl.value = '';
+      answerEl.focus();
+      questionEl.textContent = questions[currentIndex].q;
+      scoreEl.textContent = `Nombre de bonnes réponses : ${correctCount} / ${currentIndex}`;
+      startTimer();
+    }
+
+    // Valider réponse
+    function validate() {
+      stopTimer();
+      const userAnswer = answerEl.value.trim();
+      const correctAnswer = questions[currentIndex].a;
+      const isCorrect = userAnswer === correctAnswer;
+
+      if (isCorrect) correctCount++;
+
+      results.push({
+        question: questions[currentIndex].q,
+        userAnswer,
+        correctAnswer,
+        time: elapsedTime.toFixed(2),
+        correct: isCorrect
+      });
+
+      currentIndex++;
+      if (currentIndex >= NUM_QUESTIONS) {
+        showSummary();
+      } else {
+        showQuestion();
+      }
+    }
+
+    // Afficher résumé + envoyer résultats
+    async function showSummary() {
+      quizEl.style.display = 'none';
+      countdownEl.style.display = 'none';
+      summaryEl.style.display = 'block';
+
+      const totalTime = results.reduce((sum, r) => sum + parseFloat(r.time), 0).toFixed(2);
+      summaryEl.innerHTML = `
+        <p style="font-weight:bold; font-size:1.2em; color:#2a6ebb;">
+          Bravo !!! Tu as répondu correctement à ${correctCount} questions sur ${NUM_QUESTIONS} en ${totalTime} secondes.
+        </p>
+        <table>
+          <thead>
+            <tr><th>Question</th><th>Réponse donnée</th><th>Bonne réponse</th><th>Temps (s)</th></tr>
+          </thead>
+          <tbody>
+            ${results.map(r => `
+              <tr class="${r.correct ? 'correct' : 'incorrect'}">
+                <td>${r.question}</td>
+                <td>${r.userAnswer}</td>
+                <td>${r.correctAnswer}</td>
+                <td>${r.time}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      // Envoyer résultats au backend
+      try {
+        const response = await fetch('/api/save-results', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username, results })
+        });
+        const data = await response.json();
+        if (!data.success) {
+          alert('Erreur lors de la sauvegarde des résultats.');
+        }
+      } catch (err) {
+        console.error('Erreur sauvegarde:', err);
+      }
+    }
+
+    // Gestion touche Entrée
+    answerEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (answerEl.value.trim() !== '') validate();
+      }
+    });
+
+    validateBtn.addEventListener('click', () => {
+      if (answerEl.value.trim() !== '') validate();
+    });
+
+    // Compte à rebours avant démarrage
+    function startCountdown() {
+      let count = 5;
+      countdownEl.textContent = `Le quiz commence dans ${count}...`;
+      const interval = setInterval(() => {
+        count--;
+        if (count <= 0) {
+          clearInterval(interval);
+          countdownEl.style.display = 'none';
+          quizEl.style.display = 'block';
+          showQuestion();
+        } else {
+          countdownEl.textContent = `Le quiz commence dans ${count}...`;
+        }
+      }, 1000);
+    }
+
+    loadQuestions();
+  </script>
+</body>
+</html>
