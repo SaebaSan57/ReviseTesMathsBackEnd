@@ -3,6 +3,7 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
+const router = express.Router();
 const fetch = require('node-fetch');
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzeyVAuvQPLeyDh-ihFavNKUc8_kkHd6pKCypBfmKaHOxR9dsn8Ke5hSVKfA2U5D14YLg/exec'; // remplace par ton URL
 
