@@ -3,6 +3,9 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
+const fetch = require('node-fetch');
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzeyVAuvQPLeyDh-ihFavNKUc8_kkHd6pKCypBfmKaHOxR9dsn8Ke5hSVKfA2U5D14YLg/exec'; // remplace par ton URL
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,7 +43,7 @@ app.post('/api/login', (req, res) => {
 });
 
 // API pour sauvegarder les résultats
-app.post('/api/save-results', (req, res) => {
+/*app.post('/api/save-results', (req, res) => {
   const { username, results } = req.body;
   if (!username || !Array.isArray(results)) {
     return res.status(400).json({ success: false, error: 'Invalid payload' });
@@ -55,6 +58,34 @@ app.post('/api/save-results', (req, res) => {
 
   fs.appendFileSync(filePath, content);
   res.json({ success: true });
+});*/
+
+app.post('/api/save-results', async (req, res) => {
+  const { username, results } = req.body;
+
+  if (!username || !Array.isArray(results)) {
+    return res.status(400).json({ success: false, error: 'Invalid payload' });
+  }
+
+  try {
+    // Appel vers Google Apps Script
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, results })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ success: false, error: 'Erreur côté Google Apps Script' });
+    }
+  } catch (error) {
+    console.error('Erreur lors de l’envoi vers Google Sheets:', error);
+    res.status(500).json({ success: false, error: 'Erreur réseau ou Google Script' });
+  }
 });
 
 app.listen(PORT, () => {
